@@ -1,6 +1,6 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
-import { Leaf, Camera } from 'lucide-react';
+import { Leaf, Camera, Upload, Image as ImageIcon, AlertTriangle } from 'lucide-react';
 
 interface SimpleCameraComponentProps {
   onCapture: (imageSrc: string) => void;
@@ -16,8 +16,24 @@ const SimpleCameraComponent: React.FC<SimpleCameraComponentProps> = ({
   isLoading = false
 }) => {
   const webcamRef = useRef<Webcam>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [cameraNotSupported, setCameraNotSupported] = useState(false);
+  const [cameraErrorMessage, setCameraErrorMessage] = useState<string | null>(null);
+
+  // Check if getUserMedia is supported
+  useEffect(() => {
+    const checkCameraSupport = () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.log("getUserMedia is not supported in this browser");
+        setCameraNotSupported(true);
+        setCameraErrorMessage("Camera not supported in this browser. Please use image upload instead.");
+      }
+    };
+    
+    checkCameraSupport();
+  }, []);
 
   const videoConstraints = {
     width: 1280,
@@ -26,6 +42,8 @@ const SimpleCameraComponent: React.FC<SimpleCameraComponentProps> = ({
   };
 
   const handleCapture = useCallback(() => {
+    if (cameraNotSupported) return;
+    
     setIsCapturing(true);
     
     try {
@@ -42,17 +60,58 @@ const SimpleCameraComponent: React.FC<SimpleCameraComponentProps> = ({
     } finally {
       setIsCapturing(false);
     }
-  }, [onCapture, onError]);
+  }, [onCapture, onError, cameraNotSupported]);
 
   const handleUserMediaError = useCallback((error: string | DOMException) => {
     console.error("Camera error:", error);
-    onError(`Camera access error: ${error instanceof DOMException ? error.name : error}`);
+    
+    // Check if it's a getUserMedia not implemented error
+    const errorMessage = error instanceof DOMException ? error.message : String(error);
+    if (errorMessage.includes("getUserMedia is not implemented") || 
+        errorMessage.includes("not implemented") ||
+        errorMessage.includes("NotAllowedError") ||
+        errorMessage.includes("NotFoundError")) {
+      setCameraNotSupported(true);
+      setCameraErrorMessage(`Camera access error: ${errorMessage}`);
+    }
+    
+    onError(`Camera access error: ${error instanceof DOMException ? error.message : error}`);
   }, [onError]);
 
   const handleUserMedia = useCallback(() => {
     console.log("Camera ready");
     setIsCameraReady(true);
   }, []);
+  
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Check if the file is an image
+    if (!file.type.startsWith('image/')) {
+      onError("Please select an image file");
+      return;
+    }
+    
+    // Convert the file to a base64 string
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result;
+      if (typeof result === 'string') {
+        onCapture(result);
+      } else {
+        onError("Failed to read the image file");
+      }
+    };
+    reader.onerror = () => {
+      onError("Failed to read the image file");
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
@@ -73,20 +132,51 @@ const SimpleCameraComponent: React.FC<SimpleCameraComponentProps> = ({
 
       {/* Camera container */}
       <div className="flex-grow relative overflow-hidden" style={{ height: "calc(100% - 120px)" }}>
-        <Webcam
-          audio={false}
-          ref={webcamRef}
-          screenshotFormat="image/jpeg"
-          videoConstraints={videoConstraints}
-          onUserMediaError={handleUserMediaError}
-          onUserMedia={handleUserMedia}
-          className="w-full h-full object-cover"
-          style={{ background: '#000' }}
-          mirrored={false}
-        />
+        {!cameraNotSupported && (
+          <Webcam
+            audio={false}
+            ref={webcamRef}
+            screenshotFormat="image/jpeg"
+            videoConstraints={videoConstraints}
+            onUserMediaError={handleUserMediaError}
+            onUserMedia={handleUserMedia}
+            className="w-full h-full object-cover"
+            style={{ background: '#000' }}
+            mirrored={false}
+          />
+        )}
+
+        {/* Camera not supported message */}
+        {cameraNotSupported && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black p-6">
+            <AlertTriangle size={48} className="text-yellow-400 mb-4" />
+            <h2 className="text-white text-xl font-bold mb-2">Camera Not Available</h2>
+            <p className="text-white text-center mb-6">
+              {cameraErrorMessage || "Camera access is not available in this browser or device."}
+            </p>
+            <p className="text-gray-300 text-center mb-8">
+              You can still identify plants by uploading an image instead.
+            </p>
+            <button
+              onClick={triggerFileUpload}
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg flex items-center"
+              disabled={isLoading}
+            >
+              <Upload size={20} className="mr-2" />
+              Upload Plant Image
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              accept="image/*" 
+              onChange={handleFileUpload} 
+              className="hidden"
+            />
+          </div>
+        )}
 
         {/* Loading indicator */}
-        {!isCameraReady && (
+        {!isCameraReady && !cameraNotSupported && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
             <Camera size={48} className="text-white mb-4 animate-pulse" />
             <p className="text-white text-center px-4 text-xl">
@@ -105,29 +195,47 @@ const SimpleCameraComponent: React.FC<SimpleCameraComponentProps> = ({
           </div>
         )}
         
-        {/* Framing guide */}
-        <div className="absolute inset-0 border-2 border-white/40 m-8 rounded-lg pointer-events-none" />
-        
-        {/* Plant positioning instructions */}
-        <div className="absolute bottom-28 inset-x-0 bg-black/60 p-4 text-white text-center flex items-center justify-center space-x-2">
-          <Leaf size={20} className="text-green-400" />
-          <p>Position the plant in the frame</p>
-        </div>
+        {/* Framing guide - only show when camera is working */}
+        {!cameraNotSupported && isCameraReady && (
+          <>
+            <div className="absolute inset-0 border-2 border-white/40 m-8 rounded-lg pointer-events-none" />
+            
+            {/* Plant positioning instructions */}
+            <div className="absolute bottom-28 inset-x-0 bg-black/60 p-4 text-white text-center flex items-center justify-center space-x-2">
+              <Leaf size={20} className="text-green-400" />
+              <p>Position the plant in the frame</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Capture button container */}
       <div className="bg-black h-24 flex items-center justify-center w-full shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)] z-20 relative">
-        {/* Actual button */}
-        <button
-          onClick={handleCapture}
-          disabled={!isCameraReady || isCapturing || isLoading}
-          className={`w-20 h-20 rounded-full border-4 border-white flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform ${
-            !isCameraReady || isCapturing || isLoading ? 'opacity-50 cursor-not-allowed' : 'opacity-100'
-          }`}
-          aria-label="Take photo"
-        >
-          <div className="w-14 h-14 rounded-full bg-white" />
-        </button>
+        {/* Show either capture button or upload button based on camera support */}
+        {!cameraNotSupported ? (
+          <button
+            onClick={handleCapture}
+            disabled={!isCameraReady || isCapturing || isLoading}
+            className={`w-20 h-20 rounded-full border-4 border-white flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform ${
+              !isCameraReady || isCapturing || isLoading ? 'opacity-50 cursor-not-allowed' : 'opacity-100'
+            }`}
+            aria-label="Take photo"
+          >
+            <div className="w-14 h-14 rounded-full bg-white" />
+          </button>
+        ) : (
+          <button
+            onClick={triggerFileUpload}
+            disabled={isLoading}
+            className={`px-6 py-3 bg-green-600 rounded-full text-white flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform ${
+              isLoading ? 'opacity-50 cursor-not-allowed' : 'opacity-100'
+            }`}
+            aria-label="Upload photo"
+          >
+            <ImageIcon size={20} className="mr-2" />
+            Upload Image
+          </button>
+        )}
       </div>
       
       {/* Capture Feedback */}

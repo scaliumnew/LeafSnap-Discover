@@ -216,12 +216,26 @@ const ResultsScreen = () => {
           <div className="text-center p-8 bg-white rounded-lg shadow-md border border-gray-100">
             <Info size={48} className="mx-auto text-red-400 mb-4" />
             <p className="text-gray-600 mb-6">{errorMessage}</p>
+            {(errorMessage.includes("getUserMedia") || errorMessage.includes("Camera access error")) && (
+              <div className="mb-4 bg-yellow-50 p-4 rounded-lg text-sm">
+                <h3 className="font-bold text-yellow-700 mb-2">Browser Camera Issue</h3>
+                <p className="text-yellow-800 mb-3">
+                  Your browser doesn't support camera access or permission was denied.
+                </p>
+                <ul className="text-left list-disc pl-5 text-gray-700 space-y-1">
+                  <li>Try using a modern browser like Chrome or Firefox</li>
+                  <li>Make sure camera permissions are enabled</li>
+                  <li>If on iOS, use Safari for best compatibility</li>
+                  <li>Use the "Upload Image" option instead</li>
+                </ul>
+              </div>
+            )}
             {isScreenCapture && (
               <p className="text-sm text-blue-600 mb-4">
                 Tip: For better results, try taking a direct photo of the plant instead of a screen capture.
               </p>
             )}
-            <button
+            <button 
               onClick={handleTryAgain}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors mx-auto"
             >

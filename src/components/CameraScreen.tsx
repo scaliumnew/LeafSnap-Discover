@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from "@/hooks/use-toast";
 import SimpleCameraComponent from './camera/SimpleCameraComponent';
@@ -6,6 +6,14 @@ import SimpleCameraComponent from './camera/SimpleCameraComponent';
 const CameraScreen = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [hasShownCameraError, setHasShownCameraError] = useState(false);
+
+  // Only show toast for camera error once to avoid repeated error messages
+  useEffect(() => {
+    return () => {
+      setHasShownCameraError(false); // Reset when component unmounts
+    };
+  }, []);
 
   const handleCapture = async (imageSrc: string) => {
     setIsLoading(true);
@@ -135,11 +143,26 @@ const CameraScreen = () => {
 
   const handleError = (error: string) => {
     console.error("Camera error:", error);
-    toast({
-      title: "Camera error",
-      description: error,
-      variant: "destructive"
-    });
+    
+    // Only show the toast once for camera errors
+    if (!hasShownCameraError && (
+      error.includes("getUserMedia is not implemented") || 
+      error.includes("Camera access error")
+    )) {
+      setHasShownCameraError(true);
+      toast({
+        title: "Camera error",
+        description: error,
+        variant: "destructive"
+      });
+    } else if (!error.includes("Camera access error")) {
+      // For non-camera errors, always show the toast
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleClose = () => {
