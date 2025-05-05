@@ -8,8 +8,16 @@ import json
 import os
 import random
 import time
-# Assuming the plant identification module is available and can be imported
-# import plant_identification_module # Replace with actual import
+import traceback  # Add traceback for better error logging
+import base64
+# Import Google Generative AI library
+try:
+    import google.generativeai as genai
+except ImportError:
+    print("Google GenerativeAI library not found. Installing...")
+    import subprocess
+    subprocess.check_call(["pip", "install", "google-generativeai"])
+    import google.generativeai as genai
 
 app = FastAPI()
 
@@ -27,8 +35,21 @@ app.add_middleware(
 async def health_check():
     return {"status": "ok"}
 
-# Plant.id API key - you'll need to replace this with your actual API key
-PLANT_ID_API_KEY = os.getenv("PLANT_ID_API_KEY", "")  # Get from environment variable
+# Gemini API key - using the key provided by the user
+GEMINI_API_KEY = "AIzaSyAzPI6gm13GU3Gqn2PTRZFgYl7qWJDhfuc"
+
+# Initialize Gemini configuration
+genai.configure(api_key=GEMINI_API_KEY)
+
+# Test the Gemini API at startup to ensure it's working
+try:
+    # Don't test at startup to avoid unnecessary errors
+    # text_model = genai.GenerativeModel('gemini-pro')
+    # response = text_model.generate_content("Hello, world!")
+    print("Gemini API configured with provided key.")
+except Exception as e:
+    print(f"Warning: Failed to initialize Gemini API: {e}")
+    traceback.print_exc()
 
 def detect_screen(image):
     """
@@ -261,7 +282,7 @@ def detect_plant(image):
             except Exception as e:
                 print(f"Error saving masks: {e}")
             
-            return confidence, plant_ratio, edge_ratio, flower_ratio > 0.05
+            return confidence, plant_ratio, edge_ratio, flower_ratio > 0.1 # Increased threshold
         
         # Analyze both original and processed image (if screen detected)
         if is_screen:
@@ -601,8 +622,37 @@ async def predict_plant(file: UploadFile = File(...)):
             print(f"Could not create debug directory: {e}")
         
         # Read the image
-        image_bytes = await file.read()
-        image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+        try:
+            image_bytes = await file.read()
+            if not image_bytes:
+                return {
+                    "is_plant": False,
+                    "error": "Empty image file received. Please try again with a valid photo.",
+                    "suggestions": []
+                }
+                
+            # Log image file details for debugging
+            print(f"Received image file: {file.filename}, size: {len(image_bytes)} bytes")
+            
+            # Decode the image
+            try:
+                image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+            except Exception as decode_error:
+                print(f"Image decoding error: {decode_error}")
+                traceback.print_exc()
+                return {
+                    "is_plant": False,
+                    "error": "Unable to decode the image. The file may be corrupted or in an unsupported format.",
+                    "suggestions": []
+                }
+        except Exception as read_error:
+            print(f"Error reading image file: {read_error}")
+            traceback.print_exc()
+            return {
+                "is_plant": False,
+                "error": "Failed to read the uploaded image file.",
+                "suggestions": []
+            }
         
         # Check if we have a valid image
         if image is None:
@@ -630,11 +680,20 @@ async def predict_plant(file: UploadFile = File(...)):
             print(f"Could not save input image: {e}")
         
         # Detect if the image contains a plant
-        plant_confidence, has_flower, is_on_screen = detect_plant(image)
-        print(f"Plant confidence score: {plant_confidence}, Has flower: {has_flower}, Is on screen: {is_on_screen}")
+        try:
+            plant_confidence, has_flower, is_on_screen = detect_plant(image)
+            print(f"Plant confidence score: {plant_confidence}, Has flower: {has_flower}, Is on screen: {is_on_screen}")
+        except Exception as detection_error:
+            print(f"Error in plant detection: {detection_error}")
+            traceback.print_exc()
+            return {
+                "is_plant": False,
+                "error": "Error processing the image during plant detection.",
+                "suggestions": []
+            }
         
-        # If confidence is too low, return no plant detected - LOWERED THRESHOLD
-        if plant_confidence < 0.08:  # Reduced threshold for plant detection from 0.15 to 0.08
+        # If confidence is too low, return no plant detected
+        if plant_confidence < 0.08:  # Reduced threshold for plant detection
             return {
                 "is_plant": False,
                 "error": "No plant detected in the image. Please take a photo of a plant.",
@@ -648,93 +707,204 @@ async def predict_plant(file: UploadFile = File(...)):
             print(f"Saved processed image to {processed_path}")
         except Exception as img_save_err:
             print(f"Could not save debug image: {img_save_err}")
-        
-        # IF YOU HAVE A PLANT ID API KEY:
-        if PLANT_ID_API_KEY != "":
-            # Use Plant.id API to identify the plant
-            response = requests.post(
-                "https://api.plant.id/v2/identify",
-                headers={
-                    "Content-Type": "application/json",
-                    "Api-Key": PLANT_ID_API_KEY
-                },
-                json={
-                    "images": [encode_image_to_base64(image_bytes)],
-                    "modifiers": ["crops_fast", "similar_images"],
-                    "plant_language": "en",
-                    "plant_details": ["common_names", "url", "wiki_description", "taxonomy", "images"]
-                }
-            )
+
+        # --- Use Google Gemini Vision API ---
+        try:
+            print("Attempting plant identification with Gemini Vision API...")
+            # Initialize the Gemini Vision model (using gemini-1.5-flash)
+            vision_model = genai.GenerativeModel('gemini-1.5-flash')
+
+            # Prepare the image data for the API
+            # Ensure we have the content type from the uploaded file
+            content_type = file.content_type if file.content_type else "image/jpeg" # Default if not provided
+            image_part = {
+                "mime_type": content_type,
+                "data": image_bytes
+            }
+
+            # Create the prompt for Gemini
+            prompt = """
+            Identify the plant species in the provided image. 
+            Respond ONLY with a JSON object containing the following fields:
+            - scientific_name: The scientific name (genus and species).
+            - common_names: A list of common names (strings).
+            - family: The plant family.
+            - description: A brief description of the plant.
+            - probability: Your confidence score (0.0 to 1.0) for the primary identification.
+            - growing_info: Basic care or growing information (optional).
+            - alternatives: A list of up to 2 alternative identifications, each with 'scientific_name', 'common_names', and 'probability' fields (optional).
+
+            Example JSON format:
+            {
+              "scientific_name": "Monstera deliciosa",
+              "common_names": ["Swiss Cheese Plant"],
+              "family": "Araceae",
+              "description": "A tropical plant known for its large, split leaves.",
+              "probability": 0.95,
+              "growing_info": "Prefers bright, indirect light and well-draining soil.",
+              "alternatives": [
+                {"scientific_name": "Philodendron bipinnatifidum", "common_names": ["Tree Philodendron"], "probability": 0.7}
+              ]
+            }
+            If you cannot identify a plant, return a JSON object with "scientific_name": "Unknown Plant".
+            """
+
+            # Generate content using the vision model
+            response = vision_model.generate_content([prompt, image_part])
             
-            result = process_plant_id_response(response.json())
-            result["detected_from_screen"] = is_on_screen
-            return result
-        
-        # ELSE: RETURN MOCK DATA FOR TESTING
-        else:
-            mock_data = get_mock_plant_data(plant_confidence, has_flower, is_on_screen)
+            print(f"Gemini API Response Text: {response.text}")
+
+            # Process the Gemini response
+            api_result = process_gemini_response(response.text, bool(has_flower), bool(is_on_screen))
             
-            # Add special message for screen-detected plants
+            # Add screen message if detected
             if is_on_screen:
-                mock_data["screen_message"] = "Plant was detected from a screen image. This shows the app can identify plants from pictures on screens or monitors!"
-            
-            return mock_data
-        
+                 api_result["screen_message"] = "Plant was detected from a screen image. Identification might be less accurate."
+
+            # Convert numpy bools just in case process_gemini_response didn't
+            api_result['has_flower'] = bool(api_result.get('has_flower', False))
+            api_result['detected_from_screen'] = bool(api_result.get('detected_from_screen', False))
+
+            return api_result
+
+        except Exception as api_error:
+            print(f"Error calling Gemini API: {api_error}")
+            traceback.print_exc()
+            # Fallback to mock data or error message if API fails
+            return {
+                "is_plant": True, # Assume it's a plant if detection passed
+                "error": "Could not identify the plant using the AI model. Please try again.",
+                "suggestions": [],
+                "has_flower": bool(has_flower),
+                "detected_from_screen": bool(is_on_screen)
+            }
+        # --- End Gemini API Call ---
+
     except Exception as e:
-        print(f"Error processing image: {e}")
-        import traceback
+        print(f"Unhandled error processing image: {e}")
         traceback.print_exc()
         return {
             "is_plant": False,
-            "error": f"Error processing image: {str(e)}",
+            "error": f"Internal server error: {str(e)}",
             "suggestions": []
         }
 
-def encode_image_to_base64(image_bytes):
-    """Encode image bytes to base64 string."""
-    import base64
-    return base64.b64encode(image_bytes).decode('utf-8')
-
-def process_plant_id_response(response_data):
-    """Process and format the response from Plant.id API."""
-    # Check if we have results
-    if not response_data.get("suggestions"):
-        return {
-            "is_plant": False,
-            "error": "No plant matches found. Please try a clearer photo.",
-            "suggestions": []
-        }
-    
-    # Format the response
-    suggestions = []
-    for suggestion in response_data["suggestions"]:
-        plant_details = suggestion.get("plant_details", {})
+def process_gemini_response(response_text, has_flower=False, is_on_screen=False):
+    """
+    Process and format the response from Google Gemini API.
+    Converts Gemini output to our app's expected format.
+    """
+    try:
+        # Extract the JSON part from the response
+        # First, try to find JSON in the response text (it might contain markdown formatting)
+        import re
+        json_match = re.search(r'```json\s*(.*?)\s*```', response_text, re.DOTALL)
         
-        # Ensure we have all required fields
-        formatted_details = {
-            "common_names": plant_details.get("common_names", []),
-            "wiki_description": plant_details.get("wiki_description", {"value": "No description available"}),
-            "taxonomy": plant_details.get("taxonomy", {
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            # If no JSON block, try to extract anything that looks like JSON
+            json_match = re.search(r'({.*})', response_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # If still no match, use the entire response
+                json_str = response_text
+        
+        # Try to parse the JSON
+        try:
+            plant_data = json.loads(json_str)
+        except json.JSONDecodeError:
+            # If parsing fails, create a basic structure from the text
+            print(f"Failed to parse JSON from Gemini response, creating basic structure")
+            plant_data = {
+                "scientific_name": "Unknown Plant",
+                "common_names": ["Plant"],
                 "family": "Unknown",
-                "genus": "Unknown",
-                "species": "Unknown"
-            }),
-            "url": plant_details.get("url", ""),
-            "images": plant_details.get("images", [])
+                "description": response_text[:200] + "...",  # Use part of the response as description
+                "probability": 0.7,
+                "growing_info": "Information not available",
+                "additional_info": "Could not extract structured data from the AI response"
+            }
+        
+        # Create the suggestion in our app's format
+        scientific_name = plant_data.get("scientific_name", "Unknown Plant")
+        probability = plant_data.get("probability", 0.85)
+        
+        # Create the plant details structure
+        plant_details = {
+            "common_names": plant_data.get("common_names", []),
+            "wiki_description": {
+                "value": plant_data.get("description", "No description available")
+            },
+            "taxonomy": {
+                "family": plant_data.get("family", "Unknown"),
+                "genus": scientific_name.split()[0] if len(scientific_name.split()) > 1 else "Unknown",
+                "species": scientific_name.split()[1] if len(scientific_name.split()) > 1 else scientific_name
+            },
+            "url": "",  # No URL available from Gemini
+            "images": []  # No additional reference images from Gemini
         }
         
-        suggestions.append({
-            "id": suggestion.get("id", 0),
-            "plant_name": suggestion.get("plant_name", "Unknown"),
-            "probability": suggestion.get("probability", 0),
-            "plant_details": formatted_details
-        })
-    
-    return {
-        "is_plant": True,
-        "suggestions": suggestions
-    }
+        # Add flower details if relevant
+        if has_flower:
+            plant_details["flower_details"] = {
+                "color": "Unknown",  # Can't reliably extract from Gemini
+                "blooming_season": "Unknown",
+                "care_level": plant_data.get("growing_info", "Moderate")
+            }
+        
+        # Create the suggestions array
+        suggestions = [{
+            "id": 12345,  # Use a dummy ID
+            "plant_name": scientific_name,
+            "probability": probability,
+            "plant_details": plant_details
+        }]
+        
+        # Sometimes Gemini might identify multiple plants - try to extract them
+        if "alternatives" in plant_data and isinstance(plant_data["alternatives"], list):
+            for i, alt in enumerate(plant_data["alternatives"][:2]):  # Get up to 2 alternatives
+                alt_name = alt.get("scientific_name", f"Alternative Plant {i+1}")
+                alt_prob = alt.get("probability", max(0.1, probability - 0.2))
+                
+                alt_suggestion = {
+                    "id": 12345 + (i+1),
+                    "plant_name": alt_name,
+                    "probability": alt_prob,
+                    "plant_details": {
+                        "common_names": alt.get("common_names", []),
+                        "wiki_description": {
+                            "value": alt.get("description", "No description available")
+                        },
+                        "taxonomy": {
+                            "family": alt.get("family", "Unknown"),
+                            "genus": alt_name.split()[0] if len(alt_name.split()) > 1 else "Unknown",
+                            "species": alt_name.split()[1] if len(alt_name.split()) > 1 else alt_name
+                        },
+                        "url": "",
+                        "images": []
+                    }
+                }
+                suggestions.append(alt_suggestion)
+        
+        # Return the formatted response
+        return {
+            "is_plant": True,
+            "has_flower": has_flower,
+            "detected_from_screen": is_on_screen,
+            "confidence": probability,
+            "suggestions": suggestions
+        }
+    except Exception as e:
+        print(f"Error processing Gemini response: {e}")
+        traceback.print_exc()
+        return {
+            "is_plant": True,
+            "error": "Error processing plant identification results.",
+            "suggestions": []
+        }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8004)

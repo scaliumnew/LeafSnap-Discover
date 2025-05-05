@@ -10,12 +10,16 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       '/api': {
-        target: 'http://localhost:8001',
+        target: 'http://localhost:8004', // Updated port
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       },
       '/predict': {
-        target: 'http://localhost:8001',
+        target: 'http://localhost:8004', // Updated port
+        changeOrigin: true
+      },
+      '/health': { // Added rule for /health
+        target: 'http://localhost:8004',
         changeOrigin: true
       }
     }
