@@ -42,6 +42,7 @@ interface PlantResponse {
   detected_from_screen: boolean;
   confidence: number;
   error?: string;
+  screen_message?: string;
   suggestions: PlantSuggestion[];
 }
 
@@ -61,6 +62,7 @@ const ResultsScreen = () => {
   const isPlant = rawData?.is_plant ?? false;
   const errorMessage = rawData?.error;
   const isScreenCapture = rawData?.detected_from_screen ?? false;
+  const screenMessage = rawData?.screen_message;
 
   const handleTryAgain = () => {
     navigate('/camera');
@@ -179,6 +181,9 @@ const ResultsScreen = () => {
             <Info size={16} className="inline-block mr-1" />
             Plant identified from screen image - results may have slightly lower accuracy
           </p>
+          {screenMessage && (
+            <p className="text-blue-600 text-xs mt-1 italic">{screenMessage}</p>
+          )}
         </div>
       )}
       

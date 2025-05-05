@@ -70,7 +70,7 @@ console.log(`${colors.bright}${colors.green}
 🌿 LeafSnap Discover is starting up!
 -------------------------------------------------------------------------
 Access the application at: http://localhost:8080
-Backend API is available at: http://localhost:8000
+Backend API is available at: http://localhost:8001
 -------------------------------------------------------------------------
 Press Ctrl+C to shut down both servers
 -------------------------------------------------------------------------${colors.reset}
