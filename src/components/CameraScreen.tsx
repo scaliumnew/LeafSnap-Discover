@@ -14,7 +14,7 @@ const CameraScreen = () => {
     try {
       // Check if backend is accessible first
       try {
-        const healthCheck = await fetch('http://localhost:8000/health');
+        const healthCheck = await fetch('/api/health');
         if (!healthCheck.ok) {
           throw new Error("Backend server is not responding");
         }
@@ -24,7 +24,7 @@ const CameraScreen = () => {
         }
       } catch (error) {
         console.error("Backend connection error:", error);
-        throw new Error("Cannot connect to the backend server. Please make sure it's running on http://localhost:8000");
+        throw new Error("Cannot connect to the backend server. Please make sure it's running.");
       }
 
       // Extract base64 data
@@ -47,7 +47,7 @@ const CameraScreen = () => {
       formData.append('file', blob, 'capture.jpg');
 
       // Send image to the plant-species-recognition backend
-      const response = await fetch('http://localhost:8000/predict', {
+      const response = await fetch('/predict', {
         method: 'POST',
         body: formData,
       });

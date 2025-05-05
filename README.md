@@ -30,7 +30,29 @@ A plant species identification application built with React and Python. This app
 - Python 3.8+
 - pip
 
-### Frontend Setup
+### Integrated Setup (Recommended)
+
+Run both frontend and backend servers with a single command:
+
+```bash
+# Install dependencies
+npm install
+pip install -r plant-species-recognition/requirements.txt
+
+# Start both servers together
+npm run start
+```
+
+This will start:
+- The frontend on http://localhost:8080
+- The backend on http://localhost:8000
+- All API calls will be proxied automatically
+
+### Separate Setup (Alternative)
+
+If you prefer to run the servers separately:
+
+#### Frontend Setup
 
 1. Navigate to the project directory:
    ```bash
@@ -47,7 +69,7 @@ A plant species identification application built with React and Python. This app
    npm run dev
    ```
 
-### Backend Setup
+#### Backend Setup
 
 1. Navigate to the backend directory:
    ```bash
@@ -72,7 +94,7 @@ A plant species identification application built with React and Python. This app
 
 ## Usage
 
-1. Open the application in your browser
+1. Open the application in your browser at http://localhost:8080
 2. Allow camera access when prompted
 3. Point your camera at a plant
 4. Click the capture button
