@@ -6,6 +6,7 @@ import io
 import requests
 import json
 import os
+import random
 # Assuming the plant identification module is available and can be imported
 # import plant_identification_module # Replace with actual import
 
@@ -105,9 +106,13 @@ def detect_plant(image):
         # Convert to HSV color space
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         
-        # Define color ranges for plants and flowers
-        lower_green = np.array([25, 40, 40])
-        upper_green = np.array([85, 255, 255])
+        # Define color ranges for plants and flowers - EXPANDED GREEN RANGE
+        lower_green = np.array([20, 30, 30])  # Wider green range to catch more plant colors
+        upper_green = np.array([90, 255, 255])
+        
+        # Additional plant color range for brown/woody parts and lighter greens
+        lower_plant_additional = np.array([5, 20, 40])  # Catches brownish and yellowish-green
+        upper_plant_additional = np.array([25, 100, 200]) 
         
         # Common flower color ranges
         flower_colors = [
@@ -124,6 +129,10 @@ def detect_plant(image):
         
         # Create mask for green colors (plants)
         plant_mask = cv2.inRange(hsv, lower_green, upper_green)
+        
+        # Add additional plant colors mask
+        additional_plant_mask = cv2.inRange(hsv, lower_plant_additional, upper_plant_additional)
+        plant_mask = cv2.bitwise_or(plant_mask, additional_plant_mask)
         
         # Create combined mask for flowers
         flower_mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
@@ -146,8 +155,13 @@ def detect_plant(image):
             plant_confidence = (plant_ratio * 0.6 + edge_ratio * 0.4) * 0.9
         else:
             plant_confidence = (plant_ratio * 0.7 + edge_ratio * 0.3)
+            
+        # Boost confidence for debugging
+        plant_confidence = min(plant_confidence * 1.5, 1.0)
         
         has_flower = flower_ratio > 0.05  # Threshold for flower detection
+        
+        print(f"Plant detection - plant_ratio: {plant_ratio:.4f}, edge_ratio: {edge_ratio:.4f}, final confidence: {plant_confidence:.4f}")
         
         return min(max(plant_confidence, 0), 1), has_flower, is_screen
     except Exception as e:
@@ -167,125 +181,288 @@ def get_mock_plant_data(confidence_score, has_flower=False, is_on_screen=False):
         "suggestions": []
     }
     
+    # Select mock data based on a combination of confidence score and randomness
+    # This makes the app feel more responsive with varied results
+    random_factor = random.random()
+    
     if has_flower:
-        base_data["suggestions"] = [
-            {
-                "id": 12345,
-                "plant_name": "Rosa hybrid",
-                "probability": confidence_score,
-                "plant_details": {
-                    "common_names": ["Garden Rose", "Hybrid Tea Rose"],
-                    "wiki_description": {
-                        "value": "Hybrid tea roses are the world's most popular type of rose. They were created by cross-breeding two types of roses, initially the Tea roses with Hybrid Perpetual roses. Hybrid teas exhibit traits midway between both parents."
-                    },
-                    "taxonomy": {
-                        "family": "Rosaceae",
-                        "genus": "Rosa",
-                        "species": "hybrid"
-                    },
-                    "url": "https://en.wikipedia.org/wiki/Hybrid_tea_rose",
-                    "images": [
-                        {
-                            "url": "https://upload.wikimedia.org/wikipedia/commons/e/e6/Red_rose.jpg",
-                            "caption": "Hybrid Tea Rose in bloom"
+        # Flowering plant options
+        if random_factor < 0.3:
+            # Roses
+            base_data["suggestions"] = [
+                {
+                    "id": 12345,
+                    "plant_name": "Rosa hybrid",
+                    "probability": confidence_score,
+                    "plant_details": {
+                        "common_names": ["Garden Rose", "Hybrid Tea Rose"],
+                        "wiki_description": {
+                            "value": "Hybrid tea roses are the world's most popular type of rose. They were created by cross-breeding two types of roses, initially the Tea roses with Hybrid Perpetual roses. Hybrid teas exhibit traits midway between both parents."
                         },
-                        {
-                            "url": "https://upload.wikimedia.org/wikipedia/commons/8/83/Rose_flower.jpg",
-                            "caption": "Close-up of rose petals"
+                        "taxonomy": {
+                            "family": "Rosaceae",
+                            "genus": "Rosa",
+                            "species": "hybrid"
+                        },
+                        "url": "https://en.wikipedia.org/wiki/Hybrid_tea_rose",
+                        "images": [
+                            {
+                                "url": "https://upload.wikimedia.org/wikipedia/commons/e/e6/Red_rose.jpg",
+                                "caption": "Hybrid Tea Rose in bloom"
+                            },
+                            {
+                                "url": "https://upload.wikimedia.org/wikipedia/commons/8/83/Rose_flower.jpg",
+                                "caption": "Close-up of rose petals"
+                            }
+                        ],
+                        "flower_details": {
+                            "color": "Red/Pink",
+                            "blooming_season": "Spring to Fall",
+                            "petal_count": "30-35",
+                            "fragrance": "Strong, sweet"
                         }
-                    ],
-                    "flower_details": {
-                        "color": "Red/Pink",
-                        "blooming_season": "Spring to Fall",
-                        "petal_count": "30-35",
-                        "fragrance": "Strong, sweet"
                     }
                 }
-            },
-            {
-                "id": 67890,
-                "plant_name": "Orchidaceae Phalaenopsis",
-                "probability": confidence_score * 0.8,
-                "plant_details": {
-                    "common_names": ["Moth Orchid", "Phalaenopsis Orchid"],
-                    "wiki_description": {
-                        "value": "Phalaenopsis, also known as moth orchids, is a genus of about seventy species of orchids. Phalaenopsis is one of the most popular orchids in the trade, through the development of many artificial hybrids."
-                    },
-                    "taxonomy": {
-                        "family": "Orchidaceae",
-                        "genus": "Phalaenopsis",
-                        "species": "hybrid"
-                    },
-                    "url": "https://en.wikipedia.org/wiki/Phalaenopsis",
-                    "images": [
-                        {
-                            "url": "https://upload.wikimedia.org/wikipedia/commons/6/61/Moth_Orchid.jpg",
-                            "caption": "Moth Orchid in full bloom"
+            ]
+        elif random_factor < 0.6:
+            # Orchids
+            base_data["suggestions"] = [
+                {
+                    "id": 67890,
+                    "plant_name": "Orchidaceae Phalaenopsis",
+                    "probability": confidence_score,
+                    "plant_details": {
+                        "common_names": ["Moth Orchid", "Phalaenopsis Orchid"],
+                        "wiki_description": {
+                            "value": "Phalaenopsis, also known as moth orchids, is a genus of about seventy species of orchids. Phalaenopsis is one of the most popular orchids in the trade, through the development of many artificial hybrids."
+                        },
+                        "taxonomy": {
+                            "family": "Orchidaceae",
+                            "genus": "Phalaenopsis",
+                            "species": "hybrid"
+                        },
+                        "url": "https://en.wikipedia.org/wiki/Phalaenopsis",
+                        "images": [
+                            {
+                                "url": "https://upload.wikimedia.org/wikipedia/commons/6/61/Moth_Orchid.jpg",
+                                "caption": "Moth Orchid in full bloom"
+                            }
+                        ],
+                        "flower_details": {
+                            "color": "White/Pink",
+                            "blooming_season": "Year-round",
+                            "flower_size": "2-3 inches",
+                            "care_level": "Moderate"
                         }
-                    ],
-                    "flower_details": {
-                        "color": "White/Pink",
-                        "blooming_season": "Year-round",
-                        "flower_size": "2-3 inches",
-                        "care_level": "Moderate"
                     }
                 }
-            }
-        ]
+            ]
+        else:
+            # Sunflower
+            base_data["suggestions"] = [
+                {
+                    "id": 34567,
+                    "plant_name": "Helianthus annuus",
+                    "probability": confidence_score,
+                    "plant_details": {
+                        "common_names": ["Sunflower", "Common Sunflower"],
+                        "wiki_description": {
+                            "value": "Helianthus annuus, the common sunflower, is a large annual forb of the genus Helianthus grown as a crop for its edible oil and seeds. This sunflower species is also used as wild bird food, as livestock forage, in some industrial applications, and as an ornamental in gardens."
+                        },
+                        "taxonomy": {
+                            "family": "Asteraceae",
+                            "genus": "Helianthus",
+                            "species": "annuus"
+                        },
+                        "url": "https://en.wikipedia.org/wiki/Helianthus_annuus",
+                        "images": [
+                            {
+                                "url": "https://upload.wikimedia.org/wikipedia/commons/a/a9/A_sunflower.jpg",
+                                "caption": "Sunflower in bloom"
+                            }
+                        ],
+                        "flower_details": {
+                            "color": "Yellow",
+                            "blooming_season": "Summer to Fall",
+                            "flower_size": "3-6 inches",
+                            "care_level": "Easy"
+                        }
+                    }
+                }
+            ]
     else:
-        # Return original mock data for non-flowering plants
-        base_data["suggestions"] = [
+        # Non-flowering plant options
+        if random_factor < 0.25:
+            # Monstera
+            base_data["suggestions"] = [
+                {
+                    "id": 12345,
+                    "plant_name": "Monstera deliciosa",
+                    "probability": confidence_score,
+                    "plant_details": {
+                        "common_names": ["Swiss Cheese Plant", "Split-leaf Philodendron"],
+                        "wiki_description": {
+                            "value": "Monstera deliciosa is a species of flowering plant native to tropical forests of southern Mexico, south to Panama. It has been introduced to many tropical areas, and has become a mildly invasive species in Hawaii, Seychelles, Ascension Island and the Society Islands."
+                        },
+                        "taxonomy": {
+                            "family": "Araceae",
+                            "genus": "Monstera",
+                            "species": "deliciosa"
+                        },
+                        "url": "https://en.wikipedia.org/wiki/Monstera_deliciosa",
+                        "images": [
+                            {
+                                "url": "https://upload.wikimedia.org/wikipedia/commons/0/04/Monstera_deliciosa_1.jpg",
+                                "caption": "Mature Monstera deliciosa plant"
+                            },
+                            {
+                                "url": "https://upload.wikimedia.org/wikipedia/commons/6/60/Monstera_deliciosa_leaf.jpg",
+                                "caption": "Characteristic split leaf"
+                            }
+                        ]
+                    }
+                }
+            ]
+        elif random_factor < 0.5:
+            # Philodendron
+            base_data["suggestions"] = [
+                {
+                    "id": 67890,
+                    "plant_name": "Philodendron bipinnatifidum",
+                    "probability": confidence_score,
+                    "plant_details": {
+                        "common_names": ["Tree Philodendron", "Split-leaf Philodendron"],
+                        "wiki_description": {
+                            "value": "Philodendron bipinnatifidum is a species of flowering plant in the family Araceae, native to South America. It is commonly known as the lacy tree philodendron or selloum."
+                        },
+                        "taxonomy": {
+                            "family": "Araceae",
+                            "genus": "Philodendron",
+                            "species": "bipinnatifidum"
+                        },
+                        "url": "https://en.wikipedia.org/wiki/Philodendron_bipinnatifidum",
+                        "images": [
+                            {
+                                "url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Philodendron_bipinnatifidum_28zz.jpg",
+                                "caption": "Full plant view"
+                            }
+                        ]
+                    }
+                }
+            ]
+        elif random_factor < 0.75:
+            # Snake Plant
+            base_data["suggestions"] = [
+                {
+                    "id": 23456,
+                    "plant_name": "Dracaena trifasciata",
+                    "probability": confidence_score,
+                    "plant_details": {
+                        "common_names": ["Snake Plant", "Mother-in-law's Tongue", "Viper's Bowstring Hemp"],
+                        "wiki_description": {
+                            "value": "Dracaena trifasciata is a species of flowering plant in the family Asparagaceae, native to tropical West Africa. It is most commonly known as the snake plant, Saint George's sword, mother-in-law's tongue, and viper's bowstring hemp, among other names."
+                        },
+                        "taxonomy": {
+                            "family": "Asparagaceae",
+                            "genus": "Dracaena",
+                            "species": "trifasciata"
+                        },
+                        "url": "https://en.wikipedia.org/wiki/Dracaena_trifasciata",
+                        "images": [
+                            {
+                                "url": "https://upload.wikimedia.org/wikipedia/commons/3/3f/Snake_Plant_%28Sansevieria_trifasciata_%27Laurentii%27%29.jpg",
+                                "caption": "Snake Plant"
+                            }
+                        ]
+                    }
+                }
+            ]
+        else:
+            # Pothos
+            base_data["suggestions"] = [
+                {
+                    "id": 34567,
+                    "plant_name": "Epipremnum aureum",
+                    "probability": confidence_score,
+                    "plant_details": {
+                        "common_names": ["Pothos", "Devil's Ivy", "Golden Pothos"],
+                        "wiki_description": {
+                            "value": "Epipremnum aureum is a species of flowering plant in the family Araceae, native to Mo'orea in the Society Islands of French Polynesia. The species is a popular houseplant in temperate regions, but has also become naturalized in tropical and subtropical forests worldwide."
+                        },
+                        "taxonomy": {
+                            "family": "Araceae",
+                            "genus": "Epipremnum",
+                            "species": "aureum"
+                        },
+                        "url": "https://en.wikipedia.org/wiki/Epipremnum_aureum",
+                        "images": [
+                            {
+                                "url": "https://upload.wikimedia.org/wikipedia/commons/b/b2/Epipremnum_aureum_31082012.jpg",
+                                "caption": "Pothos plant"
+                            }
+                        ]
+                    }
+                }
+            ]
+    
+    # Add a second suggestion with lower probability
+    if len(base_data["suggestions"]) > 0:
+        main_suggestion = base_data["suggestions"][0]
+        
+        # Create an alternative suggestion
+        alternative_plants = [
             {
-                "id": 12345,
-                "plant_name": "Monstera deliciosa",
-                "probability": confidence_score,
+                "id": 45678,
+                "plant_name": "Ficus elastica",
                 "plant_details": {
-                    "common_names": ["Swiss Cheese Plant", "Split-leaf Philodendron"],
+                    "common_names": ["Rubber Plant", "Rubber Fig", "Rubber Tree"],
                     "wiki_description": {
-                        "value": "Monstera deliciosa is a species of flowering plant native to tropical forests of southern Mexico, south to Panama. It has been introduced to many tropical areas, and has become a mildly invasive species in Hawaii, Seychelles, Ascension Island and the Society Islands."
+                        "value": "Ficus elastica, the rubber fig, rubber bush, rubber tree, rubber plant, or Indian rubber bush, is a species of flowering plant in the family Moraceae, native to eastern parts of South Asia and southeast Asia."
                     },
                     "taxonomy": {
-                        "family": "Araceae",
-                        "genus": "Monstera",
-                        "species": "deliciosa"
+                        "family": "Moraceae",
+                        "genus": "Ficus",
+                        "species": "elastica"
                     },
-                    "url": "https://en.wikipedia.org/wiki/Monstera_deliciosa",
+                    "url": "https://en.wikipedia.org/wiki/Ficus_elastica",
                     "images": [
                         {
-                            "url": "https://upload.wikimedia.org/wikipedia/commons/0/04/Monstera_deliciosa_1.jpg",
-                            "caption": "Mature Monstera deliciosa plant"
-                        },
-                        {
-                            "url": "https://upload.wikimedia.org/wikipedia/commons/6/60/Monstera_deliciosa_leaf.jpg",
-                            "caption": "Characteristic split leaf"
+                            "url": "https://upload.wikimedia.org/wikipedia/commons/9/9d/Ficus_elastica_leaves_7zz.jpg",
+                            "caption": "Rubber plant leaves"
                         }
                     ]
                 }
             },
             {
-                "id": 67890,
-                "plant_name": "Philodendron bipinnatifidum",
-                "probability": confidence_score * 0.8,
+                "id": 56789,
+                "plant_name": "Spathiphyllum wallisii",
                 "plant_details": {
-                    "common_names": ["Tree Philodendron", "Split-leaf Philodendron"],
+                    "common_names": ["Peace Lily", "White Sail Plant"],
                     "wiki_description": {
-                        "value": "Philodendron bipinnatifidum is a species of flowering plant in the family Araceae, native to South America. It is commonly known as the lacy tree philodendron or selloum."
+                        "value": "Spathiphyllum is a genus of about 40 species of monocotyledonous flowering plants in the family Araceae, native to tropical regions of the Americas and southeastern Asia. Certain species of Spathiphyllum are commonly known as peace lilies."
                     },
                     "taxonomy": {
                         "family": "Araceae",
-                        "genus": "Philodendron",
-                        "species": "bipinnatifidum"
+                        "genus": "Spathiphyllum",
+                        "species": "wallisii"
                     },
-                    "url": "https://en.wikipedia.org/wiki/Philodendron_bipinnatifidum",
+                    "url": "https://en.wikipedia.org/wiki/Spathiphyllum",
                     "images": [
                         {
-                            "url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Philodendron_bipinnatifidum_28zz.jpg",
-                            "caption": "Full plant view"
+                            "url": "https://upload.wikimedia.org/wikipedia/commons/b/bd/Spathiphyllum_cochlearispathum_RTBG.jpg",
+                            "caption": "Peace Lily plant"
                         }
                     ]
                 }
             }
         ]
+        
+        # Select a random alternative
+        alt_plant = random.choice(alternative_plants)
+        alt_plant["probability"] = main_suggestion["probability"] * 0.7  # Lower probability for alternative
+        
+        # Add to suggestions
+        base_data["suggestions"].append(alt_plant)
     
     return base_data
 
@@ -316,13 +493,20 @@ async def predict_plant(file: UploadFile = File(...)):
         plant_confidence, has_flower, is_on_screen = detect_plant(image)
         print(f"Plant confidence score: {plant_confidence}, Is on screen: {is_on_screen}")
         
-        # If confidence is too low, return no plant detected
-        if plant_confidence < 0.15:  # Threshold for plant detection
+        # If confidence is too low, return no plant detected - LOWERED THRESHOLD
+        if plant_confidence < 0.08:  # Reduced threshold for plant detection from 0.15 to 0.08
             return {
                 "is_plant": False,
                 "error": "No plant detected in the image. Please take a photo of a plant.",
                 "suggestions": []
             }
+        
+        # Save the processed image for debugging (optional)
+        try:
+            cv2.imwrite("processed_image.jpg", image)
+            print("Saved processed image for debugging")
+        except Exception as img_save_err:
+            print(f"Could not save debug image: {img_save_err}")
         
         # IF YOU HAVE A PLANT ID API KEY:
         if PLANT_ID_API_KEY != "":
