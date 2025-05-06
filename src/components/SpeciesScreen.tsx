@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
@@ -93,6 +92,86 @@ const speciesList = [
     commonName: 'Chinese Money Plant',
     imageUrl: 'https://images.unsplash.com/photo-1614594604569-aee82a836218?q=80&w=1374&auto=format&fit=crop&ixlib=rb-4.0.3',
     careLevel: 'Moderate',
+  },
+  {
+    id: '11',
+    name: 'Aloe Vera',
+    family: 'Asphodelaceae',
+    commonName: 'Aloe Vera',
+    imageUrl: 'https://images.unsplash.com/photo-1519259343747-92004a99969a?q=80&w=1374&auto=format&fit=crop&ixlib=rb-4.0.3',
+    careLevel: 'Easy',
+  },
+  {
+    id: '12',
+    name: 'Zamioculcas Zamiifolia',
+    family: 'Araceae',
+    commonName: 'ZZ Plant',
+    imageUrl: 'https://images.unsplash.com/photo-1632494053982-efc957415c52?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3',
+    careLevel: 'Easy',
+  },
+  {
+    id: '13',
+    name: 'Monstera Adansonii',
+    family: 'Araceae',
+    commonName: 'Swiss Cheese Vine',
+    imageUrl: 'https://images.unsplash.com/photo-1598880940639-93b202203e18?q=80&w=1374&auto=format&fit=crop&ixlib=rb-4.0.3',
+    careLevel: 'Moderate',
+  },
+  {
+    id: '14',
+    name: 'Aglaonema',
+    family: 'Araceae',
+    commonName: 'Chinese Evergreen',
+    imageUrl: 'https://images.unsplash.com/photo-1632494114909-b94e9a7b8e91?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3',
+    careLevel: 'Easy',
+  },
+  {
+    id: '15',
+    name: 'Hoya Carnosa',
+    family: 'Apocynaceae',
+    commonName: 'Wax Plant',
+    imageUrl: 'https://images.unsplash.com/photo-1622557693053-b9515199559f?q=80&w=1374&auto=format&fit=crop&ixlib=rb-4.0.3',
+    careLevel: 'Easy',
+  },
+  {
+    id: '16',
+    name: 'Fittonia Albivenis',
+    family: 'Acanthaceae',
+    commonName: 'Nerve Plant',
+    imageUrl: 'https://images.unsplash.com/photo-1632494109813-494a58199c8e?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3',
+    careLevel: 'Moderate',
+  },
+  {
+    id: '17',
+    name: 'Peperomia Obtusifolia',
+    family: 'Piperaceae',
+    commonName: 'Baby Rubber Plant',
+    imageUrl: 'https://images.unsplash.com/photo-1587316255142-ca90970ca5ee?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3',
+    careLevel: 'Easy',
+  },
+  {
+    id: '18',
+    name: 'Nephrolepis Exaltata',
+    family: 'Nephrolepidaceae',
+    commonName: 'Boston Fern',
+    imageUrl: 'https://images.unsplash.com/photo-1587316254981-98b59b4493e8?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3',
+    careLevel: 'Moderate',
+  },
+  {
+    id: '19',
+    name: 'Beaucarnea Recurvata',
+    family: 'Asparagaceae',
+    commonName: 'Ponytail Palm',
+    imageUrl: 'https://images.unsplash.com/photo-1632494089837-34ca44a4529a?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3',
+    careLevel: 'Easy',
+  },
+  {
+    id: '20',
+    name: 'Euphorbia Trigona',
+    family: 'Euphorbiaceae',
+    commonName: 'African Milk Tree',
+    imageUrl: 'https://images.unsplash.com/photo-1622557718429-d17c14b0556f?q=80&w=1374&auto=format&fit=crop&ixlib=rb-4.0.3',
+    careLevel: 'Easy',
   },
 ];
 
