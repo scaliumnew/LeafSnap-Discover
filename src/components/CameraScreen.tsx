@@ -20,20 +20,8 @@ const CameraScreen = () => {
     console.log("Image captured, processing...");
 
     try {
-      // Check if backend is accessible first
-      try {
-        const healthCheck = await fetch('/api/health');
-        if (!healthCheck.ok) {
-          throw new Error("Backend server is not responding");
-        }
-        const health = await healthCheck.json();
-        if (health.status !== "ok") {
-          throw new Error("Backend server is not healthy");
-        }
-      } catch (error) {
-        console.error("Backend connection error:", error);
-        throw new Error("Cannot connect to the backend server. Please make sure it's running.");
-      }
+      // Removed the health check as it used a relative path and isn't strictly necessary here.
+      // We'll rely on the main predict call's error handling.
 
       // Extract base64 data
       const base64Data = imageSrc.split(',')[1];
@@ -54,8 +42,10 @@ const CameraScreen = () => {
       const formData = new FormData();
       formData.append('file', blob, 'capture.jpg');
 
-      // Send image to the plant-species-recognition backend
-      const response = await fetch('/predict', {
+      // Send image to the plant-species-recognition backend using the full URL
+      const backendUrl = 'http://localhost:8004/predict'; // Use the correct backend URL
+      console.log(`Sending request to: ${backendUrl}`); 
+      const response = await fetch(backendUrl, { 
         method: 'POST',
         body: formData,
       });
@@ -69,71 +59,40 @@ const CameraScreen = () => {
       const data = await response.json();
       console.log("Plant identification data received:", data);
 
-      // Check if a plant was detected
-      if (!data.is_plant) {
-        navigate('/results', {
-          state: {
-            imageUrl: imageSrc,
-            classification: null,
-            details: null,
-            rawData: data
-          }
-        });
-        return;
-      }
-
-      // Process the plant identification results
-      let plantName = "Unknown Plant";
-      let plantDetails = "No details available";
-
-      if (data.suggestions && data.suggestions.length > 0) {
-        const topSuggestion = data.suggestions[0];
-        plantName = topSuggestion.plant_name || "Unknown Plant";
-        
-        // Format details
-        const probability = (topSuggestion.probability * 100).toFixed(1);
-        let commonName = "N/A";
-        if (topSuggestion.plant_details && 
-            topSuggestion.plant_details.common_names && 
-            topSuggestion.plant_details.common_names.length > 0) {
-          commonName = topSuggestion.plant_details.common_names[0];
-        }
-        
-        plantDetails = `Scientific Name: ${plantName}\nCommon Name: ${commonName}\nConfidence: ${probability}%`;
-      }
-
-      // Navigate to results screen with the plant information
+      // Navigate to results screen with the raw API data
+      // ResultsScreen will handle displaying "No plant detected" based on apiResponse.is_plant
       navigate('/results', {
         state: {
           imageUrl: imageSrc,
-          classification: plantName,
-          details: plantDetails,
-          rawData: data
+          apiResponse: data // Pass the full response object
         }
       });
+
     } catch (err) {
       console.error('Error processing image:', err);
-      let errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorDescription = err instanceof Error ? err.message : 'An unknown error occurred.';
       
-      // Handle specific error cases
-      if (errorMessage.includes('Cannot connect to the backend server')) {
-        navigate('/results', {
-          state: {
-            imageUrl: imageSrc,
-            classification: null,
-            details: null,
-            rawData: {
-              is_plant: false,
-              error: errorMessage
-            }
+      // Provide specific feedback for fetch errors vs other errors
+      const displayError = errorDescription.includes("Failed to fetch") || errorDescription.includes("NetworkError")
+        ? "Could not connect to the plant identification service. Please check if the backend server is running and accessible at http://localhost:8004."
+        : `Image processing failed: ${errorDescription}`;
+
+      // Navigate to results screen showing the error
+      navigate('/results', {
+        state: {
+          imageUrl: imageSrc,
+          apiResponse: { // Construct an error response object
+            is_plant: false, 
+            error: displayError,
+            suggestions: []
           }
-        });
-        return;
-      }
+        }
+      });
       
+      // Use the defined displayError variable for the toast
       toast({
         title: "Image processing failed",
-        description: errorMessage,
+        description: displayError, 
         variant: "destructive"
       });
     } finally {
