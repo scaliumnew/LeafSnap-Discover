@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AppLogo from './AppLogo';
+import { toast } from '@/components/ui/use-toast'; // Import toast for error messages
 
 const ProcessingScreen = () => {
   const navigate = useNavigate();
@@ -11,72 +12,139 @@ const ProcessingScreen = () => {
   };
   
   const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState("Initializing..."); // Add status message state
+
+  // Function to convert data URL to Blob
+  const dataURLtoBlob = (dataurl: string): Blob | null => {
+    try {
+      const arr = dataurl.split(',');
+      if (arr.length < 2) return null;
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      if (!mimeMatch || mimeMatch.length < 2) return null;
+      const mime = mimeMatch[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while(n--){
+          u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], {type:mime});
+    } catch (e) {
+      console.error("Error converting data URL to Blob:", e);
+      return null;
+    }
+  }
 
   useEffect(() => {
-    // Simulate ML Kit processing with progressive updates
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
+    const identifyPlant = async () => {
+      setStatusMessage("Preparing image...");
+      setProgress(10);
+
+      const blob = dataURLtoBlob(imageUrl);
+
+      if (!blob) {
+        setStatusMessage("Error processing image data.");
+        toast({
+          title: "Error",
+          description: "Could not process the image data. Please try again.",
+          variant: "destructive",
+        });
+        // Optionally navigate back or show a retry button
+        setTimeout(() => navigate('/'), 3000); // Go back home after delay
+        return;
+      }
+
+      const formData = new FormData();
+      // Use a generic filename like 'upload.jpg' or derive from mime type if possible
+      const filename = `upload.${blob.type.split('/')[1] || 'jpg'}`; 
+      formData.append('file', blob, filename);
+
+      setStatusMessage("Sending image for identification...");
+      setProgress(30);
+
+      try {
+        // Ensure the backend URL is correct (adjust if needed)
+        const backendUrl = 'http://localhost:8004/predict'; 
+        console.log(`Sending request to: ${backendUrl}`); // Log the URL
+        
+        const response = await fetch(backendUrl, { 
+          method: 'POST',
+          body: formData,
+        });
+
+        setProgress(70);
+        setStatusMessage("Receiving identification results...");
+
+        if (!response.ok) {
+          // Try to get error details from response body
+          let errorMsg = `HTTP error! status: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            // Use the specific error message from backend if available
+            errorMsg = errorData.error || errorData.detail || `Server responded with status ${response.status}`; 
+            console.error("Backend error response:", errorData);
+          } catch (e) { 
+             console.error("Could not parse error response as JSON:", await response.text());
+          }
+          
+          throw new Error(errorMsg);
         }
-        return prev + 10;
-      });
-    }, 300);
 
-    // Simulate image analysis and generate plant identification results
-    const timer = setTimeout(() => {
-      // Create mock results similar to what ML Kit would provide
-      const results = [
-        {
-          id: '1',
-          name: 'Monstera Deliciosa',
-          confidence: 0.92,
-          imageUrl: 'https://images.unsplash.com/photo-1614594975525-e45190c55d0b?q=80&w=1364&auto=format&fit=crop&ixlib=rb-4.0.3',
-          commonNames: ['Swiss Cheese Plant', 'Split-leaf Philodendron'],
-          family: 'Araceae',
-          care: 'Bright indirect light, water when top inch of soil is dry'
-        },
-        {
-          id: '2',
-          name: 'Monstera Adansonii',
-          confidence: 0.78,
-          imageUrl: 'https://images.unsplash.com/photo-1598880940639-93b202203e18?q=80&w=1374&auto=format&fit=crop&ixlib=rb-4.0.3',
-          commonNames: ['Adanson\'s Monstera', 'Swiss Cheese Vine'],
-          family: 'Araceae',
-          care: 'Medium to bright indirect light, keep soil lightly moist'
-        },
-        {
-          id: '3',
-          name: 'Epipremnum Aureum',
-          confidence: 0.65,
-          imageUrl: 'https://images.unsplash.com/photo-1616500631550-6c4e08e5d82d?q=80&w=1374&auto=format&fit=crop&ixlib=rb-4.0.3',
-          commonNames: ['Pothos', 'Devil\'s Ivy'],
-          family: 'Araceae',
-          care: 'Versatile, can grow in low to bright indirect light, allow to dry between waterings'
-        },
-      ];
-      
-      navigate('/results', { 
-        state: { 
-          imageUrl,
-          results
-        } 
-      });
-    }, 3000);
+        const data = await response.json();
+        console.log("Received data from backend:", data); // Log successful response
+        setProgress(100);
+        setStatusMessage("Identification complete!");
 
-    return () => {
-      clearTimeout(timer);
-      clearInterval(interval);
+        // Check if the response indicates a plant and has suggestions
+        if (data.is_plant && data.suggestions && data.suggestions.length > 0) {
+          navigate('/results', { 
+            state: { 
+              imageUrl,
+              results: data.suggestions, // Pass the actual results from the API
+              apiResponse: data // Optionally pass the full API response
+            } 
+          });
+        } else {
+           // Handle cases where backend says it's not a plant or returns no suggestions
+           const description = data.error || "The identification service did not find a plant or could not provide suggestions.";
+           toast({
+             title: "Identification Failed",
+             description: description,
+             variant: "default", 
+           });
+           setTimeout(() => navigate('/'), 3000); // Go back home
+        }
+
+      } catch (error) {
+        console.error('Error during plant identification fetch:', error);
+        setProgress(0); // Reset progress on error
+        const errorDescription = error instanceof Error ? error.message : 'An unknown network error occurred.';
+        
+        // Provide more specific feedback for common errors
+        const displayError = errorDescription.includes("Failed to fetch") 
+          ? "Could not connect to the plant identification service. Please check if the backend server is running and accessible at http://localhost:8004."
+          : `Identification failed: ${errorDescription}`;
+          
+        setStatusMessage("Error during identification.");
+        toast({
+          title: "Identification Error",
+          description: displayError,
+          variant: "destructive",
+        });
+        // Navigate back home after showing the error
+        setTimeout(() => navigate('/'), 4000); 
+      }
     };
-  }, [navigate, imageUrl]);
 
-  // Get a descriptive message based on progress
+    identifyPlant();
+
+    // No explicit cleanup needed for fetch, but keep the structure
+    return () => { /* Potential cleanup if needed in future */ };
+  }, [navigate, imageUrl]); // Dependencies for the effect
+
+  // Simplified status message logic using the state variable
   const getStatusMessage = () => {
-    if (progress < 25) return "Analyzing image features...";
-    if (progress < 50) return "Detecting plant characteristics...";
-    if (progress < 75) return "Matching with plant database...";
-    return "Finalizing identification...";
+    return statusMessage;
   };
 
   return (

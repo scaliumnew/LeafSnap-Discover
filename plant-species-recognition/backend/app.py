@@ -846,12 +846,16 @@ def process_gemini_response(response_text, has_flower=False, is_on_screen=False)
             "images": []  # No additional reference images from Gemini
         }
         
-        # Add flower details if relevant
+        # Add flower details if relevant, attempting to extract from Gemini response
         if has_flower:
+            # Try to get flower details from the main plant_data or a specific flower_details key if Gemini provides it
+            gemini_flower_details = plant_data.get("flower_details", {}) 
+            
             plant_details["flower_details"] = {
-                "color": "Unknown",  # Can't reliably extract from Gemini
-                "blooming_season": "Unknown",
-                "care_level": plant_data.get("growing_info", "Moderate")
+                "color": gemini_flower_details.get("color", plant_data.get("flower_color", "Unknown")), # Check common keys or default
+                "blooming_season": gemini_flower_details.get("blooming_season", plant_data.get("blooming_season", "Unknown")), # Check common keys or default
+                # Keep care_level extraction as is, or try to get it from flower_details too
+                "care_level": gemini_flower_details.get("care_level", plant_data.get("growing_info", "Moderate")) 
             }
         
         # Create the suggestions array

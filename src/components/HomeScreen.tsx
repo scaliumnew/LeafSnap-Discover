@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react'; // Import useRef
 import { useNavigate } from 'react-router-dom';
 import { Camera, Image, Leaf, Book, Search, ChevronRight } from 'lucide-react';
 import AppLogo from './AppLogo';
@@ -38,19 +38,34 @@ const HomeScreen = () => {
   const navigate = useNavigate();
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null); // Add ref for file input
   const handleCameraSelect = () => {
     navigate('/camera');
   };
   const handleGallerySelect = () => {
-    // In a real app, we'd integrate with the device's gallery
-    // For now, we'll just simulate it by going to the confirmation screen
-    navigate('/confirm-image', {
-      state: {
-        imageSource: 'gallery',
-        imageUrl: 'https://images.unsplash.com/photo-1572688484438-313a6e50c333?q=80&w=1374&auto=format&fit=crop'
-      }
-    });
+    // Trigger the hidden file input
+    fileInputRef.current?.click();
   };
+
+  // Handle file selection
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        navigate('/confirm-image', {
+          state: {
+            imageSource: 'gallery',
+            imageUrl: reader.result as string // Pass the selected image data URL
+          }
+        });
+      };
+      reader.readAsDataURL(file);
+      // Reset the input value to allow selecting the same file again
+      event.target.value = ''; 
+    }
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -62,6 +77,15 @@ const HomeScreen = () => {
     }
   };
   return <div className="relative h-screen">
+      {/* Hidden File Input for Gallery Selection */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        accept="image/*" 
+        style={{ display: 'none' }} 
+      />
+
       {/* Search Bar */}
       <div className="px-4 -mt-3 mb-3">
         <form onSubmit={handleSearch} className="relative">

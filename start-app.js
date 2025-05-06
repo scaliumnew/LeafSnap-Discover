@@ -23,12 +23,20 @@ console.log(`${colors.bright}${colors.green}Starting LeafSnap Discover Applicati
 const backendDir = path.join(__dirname, 'plant-species-recognition', 'backend');
 const frontendDir = __dirname;
 
+// Environment variables for the backend
+const backendEnv = {
+  ...process.env,
+  // Set the Gemini API key
+  GEMINI_API_KEY: 'AIzaSyAzPI6gm13GU3Gqn2PTRZFgYl7qWJDhfuc' // Gemini API key for plant identification
+};
+
 // Start Backend (Python Flask)
 console.log(`${colors.blue}Starting Backend Server...${colors.reset}`);
 const backendProcess = spawn('python', ['app.py'], {
   cwd: backendDir,
   shell: true,
-  stdio: 'pipe'
+  stdio: 'pipe',
+  env: backendEnv
 });
 
 backendProcess.stdout.on('data', (data) => {

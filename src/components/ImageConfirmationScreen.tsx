@@ -46,7 +46,7 @@ const ImageConfirmationScreen = () => {
           <img 
             src={imageUrl} 
             alt="Plant to identify" 
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-contain" // Changed from object-cover
           />
         </div>
         

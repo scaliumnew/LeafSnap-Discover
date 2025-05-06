@@ -50,14 +50,15 @@ const ResultsScreen = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const { imageUrl, classification, details, rawData } = location.state || { 
+  // Destructure only what's passed: imageUrl and the full API response (as rawData)
+  const { imageUrl, apiResponse: rawData } = location.state || { 
     imageUrl: null,
-    classification: 'No classification received',
-    details: null,
-    rawData: null
+    apiResponse: null // Use apiResponse key consistent with ProcessingScreen
   };
 
+  // Extract primary suggestion and name
   const plantData = rawData?.suggestions?.[0] || null;
+  const primaryPlantName = plantData?.plant_name || 'Identification Result'; // Use actual name or a default title
   const hasPlantData = !!plantData;
   const isPlant = rawData?.is_plant ?? false;
   const errorMessage = rawData?.error;
@@ -215,8 +216,9 @@ const ResultsScreen = () => {
         {errorMessage ? (
           <div className="text-center p-8 bg-white rounded-lg shadow-md border border-gray-100">
             <Info size={48} className="mx-auto text-red-400 mb-4" />
-            <p className="text-gray-600 mb-6">{errorMessage}</p>
-            {(errorMessage.includes("getUserMedia") || errorMessage.includes("Camera access error")) && (
+            <p className="text-gray-600 mb-6">{errorMessage || "An unknown error occurred."}</p> {/* Ensure errorMessage is displayed */}
+            {/* Keep the specific camera error handling if needed, though less likely here */}
+            {(errorMessage?.includes("getUserMedia") || errorMessage?.includes("Camera access error")) && ( 
               <div className="mb-4 bg-yellow-50 p-4 rounded-lg text-sm">
                 <h3 className="font-bold text-yellow-700 mb-2">Browser Camera Issue</h3>
                 <p className="text-yellow-800 mb-3">
@@ -243,16 +245,18 @@ const ResultsScreen = () => {
               Try Again
             </button>
           </div>
-        ) : isPlant && classification && classification !== 'No classification received' ? (
-          // Main Result Card - Only show if plant was detected
+        // Use isPlant and presence of plantData to determine success
+        ) : isPlant && plantData ? ( 
+          // Main Result Card - Only show if plant was detected and we have data
           <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100 mb-4">
-            <h3 className="text-xl font-semibold text-green-800">{classification}</h3>
+            {/* Use the extracted primaryPlantName */}
+            <h3 className="text-xl font-semibold text-green-800">{primaryPlantName}</h3> 
             
-            {/* Display details if available */}
-            {details && (
-              <div className="mt-3 text-gray-700 whitespace-pre-line">
-                {details}
-              </div>
+            {/* Common Names (Example of accessing details directly from plantData) */}
+            {plantData.plant_details?.common_names && plantData.plant_details.common_names.length > 0 && (
+              <p className="text-sm text-gray-500 mb-2">
+                Also known as: {plantData.plant_details.common_names.join(', ')}
+              </p>
             )}
             
             {/* Display flower details if available */}
@@ -278,32 +282,35 @@ const ResultsScreen = () => {
               renderReferenceImages(plantData.plant_details.images)
             )}
             
-            {/* External search buttons */}
+            {/* External search buttons - Use primaryPlantName */}
             <div className="mt-5 flex flex-col space-y-2">
               <button 
-                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(classification)}`, '_blank')}
+                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(primaryPlantName)}`, '_blank')}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
               >
                 <Search size={18} />
                 Search for more info
               </button>
               
+              {/* Use Wikipedia URL from plant_details if available, otherwise construct from name */}
               <button 
-                onClick={() => window.open(`https://en.wikipedia.org/wiki/${encodeURIComponent(classification.replace(' ', '_'))}`, '_blank')}
+                onClick={() => window.open(plantData.plant_details?.url || `https://en.wikipedia.org/wiki/${encodeURIComponent(primaryPlantName.replace(' ', '_'))}`, '_blank')}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-md hover:bg-green-200 transition-colors"
               >
                 <ExternalLink size={18} />
-                View on Wikipedia
+                {plantData.plant_details?.url ? 'View Source' : 'View on Wikipedia'}
               </button>
             </div>
           </div>
         ) : (
-          // Backend Connection Error
+          // Fallback for cases where isPlant is false or plantData is missing after successful connection
           <div className="text-center p-8 bg-white rounded-lg shadow-md border border-gray-100">
-            <Info size={48} className="mx-auto text-red-400 mb-4" />
-            <p className="text-gray-600 mb-6">Could not connect to the plant identification service. Please make sure the backend server is running.</p>
+            <Info size={48} className="mx-auto text-yellow-500 mb-4" />
+            <p className="text-gray-600 mb-6">
+              {isPlant ? "Could not retrieve detailed plant information." : "No plant was detected in the image."}
+            </p>
             <button
-              onClick={handleTryAgain}
+              onClick={handleTryAgain} 
               className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors mx-auto"
             >
               <Camera size={18} />
