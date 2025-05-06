@@ -692,15 +692,10 @@ async def predict_plant(file: UploadFile = File(...)):
                 "suggestions": []
             }
         
-        # If confidence is too low, return no plant detected
-        if plant_confidence < 0.08:  # Reduced threshold for plant detection
-            return {
-                "is_plant": False,
-                "error": "No plant detected in the image. Please take a photo of a plant.",
-                "suggestions": []
-            }
+        # Removed the initial confidence check based on plant_confidence.
+        # We will now rely on the Gemini API to determine if a plant is present.
         
-        # Save the processed image for debugging
+        # Save the processed image for debugging (still useful)
         try:
             processed_path = os.path.join(debug_dir, f"processed_{timestamp}.jpg")
             cv2.imwrite(processed_path, image)
