@@ -117,49 +117,7 @@ const ResultsScreen = () => {
     );
   };
 
-  const renderFlowerDetails = (flowerDetails: PlantDetails['flower_details']) => {
-    if (!flowerDetails) return null;
-
-    return (
-      <div className="mt-4 p-4 bg-pink-50 rounded-lg">
-        <h4 className="font-medium mb-2 text-pink-800">Flower Details:</h4>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <p className="text-gray-600">Color</p>
-            <p className="font-medium text-pink-700">{flowerDetails.color}</p>
-          </div>
-          <div>
-            <p className="text-gray-600">Blooming Season</p>
-            <p className="font-medium text-pink-700">{flowerDetails.blooming_season}</p>
-          </div>
-          {flowerDetails.petal_count && (
-            <div>
-              <p className="text-gray-600">Petal Count</p>
-              <p className="font-medium text-pink-700">{flowerDetails.petal_count}</p>
-            </div>
-          )}
-          {flowerDetails.flower_size && (
-            <div>
-              <p className="text-gray-600">Flower Size</p>
-              <p className="font-medium text-pink-700">{flowerDetails.flower_size}</p>
-            </div>
-          )}
-          {flowerDetails.fragrance && (
-            <div>
-              <p className="text-gray-600">Fragrance</p>
-              <p className="font-medium text-pink-700">{flowerDetails.fragrance}</p>
-            </div>
-          )}
-          {flowerDetails.care_level && (
-            <div>
-              <p className="text-gray-600">Care Level</p>
-              <p className="font-medium text-pink-700">{flowerDetails.care_level}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+  // Removed renderFlowerDetails function definition
 
   return (
     <div className="fixed inset-0 bg-white z-50 flex flex-col">
@@ -259,10 +217,7 @@ const ResultsScreen = () => {
               </p>
             )}
             
-            {/* Display flower details if available */}
-            {hasPlantData && plantData.plant_details?.flower_details && (
-              renderFlowerDetails(plantData.plant_details.flower_details)
-            )}
+            {/* Removed Flower Details Section */}
             
             {/* Display taxonomy if available */}
             {hasPlantData && plantData.plant_details?.taxonomy && (
